@@ -2,19 +2,28 @@
 import { computed, onMounted, ref } from 'vue'
 import { api } from '../api'
 const data = ref<any>(null)
+const error = ref('')
 const candidates = ref<any[]>([])
 const violKeys = ref<Set<string>>(new Set())
 async function run() {
-  data.value = await api('/seating/run?hall_id=1', { method: 'POST' })
+  error.value = ''
   try {
-    const v = await api('/seating/violations?hall_id=1')
-    const keys = new Set<string>()
-    for (const x of v.violations || []) {
-      if (x.a_id != null) keys.add(String(x.a_id))
-      if (x.b_id != null) keys.add(String(x.b_id))
-    }
-    violKeys.value = keys
-  } catch { violKeys.value = new Set() }
+    data.value = await api('/seating/run?hall_id=1', { method: 'POST' })
+    try {
+      const v = await api('/seating/violations?hall_id=1')
+      const keys = new Set<string>()
+      for (const x of v.violations || []) {
+        if (x.a_id != null) keys.add(String(x.a_id))
+        if (x.b_id != null) keys.add(String(x.b_id))
+      }
+      violKeys.value = keys
+    } catch { violKeys.value = new Set() }
+  } catch (e: any) {
+    // Failed closed session adds no plan: never show a stale graph.
+    data.value = null
+    violKeys.value = new Set()
+    error.value = e?.message || '排座失败'
+  }
 }
 onMounted(async () => {
   candidates.value = await api('/candidates')
@@ -45,19 +54,30 @@ function paperClass(pid: number) {
 <template>
   <h1>考场课桌网格</h1>
   <p class="sub">课桌网格为主视图 · 左侧考生名册夹板 · 违规课桌高亮</p>
-  <button class="btn" @click="run">重新排座</button>
-  <div class="hs-classroom" style="margin-top:0.85rem">
+  <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.85rem">
+    <button class="btn" @click="run">重新排座</button>
+    <span v-if="data" class="badge" :class="data.state === 'closed' ? 'badge-bad' : 'badge-ok'">
+      {{ data.state === 'closed' ? '封闭场' : '开放场' }}
+    </span>
+  </div>
+  <div v-if="error" class="card" style="border-color:var(--hs-bad);color:var(--hs-bad);font-weight:700">
+    {{ error }}
+  </div>
+  <div class="hs-classroom" v-if="data">
     <aside class="hs-clipboard">
       <h2>考生名册</h2>
       <div v-for="c in candidates" :key="c.id" class="hs-roster-row">
         <div>
-          <div>{{ c.name }}</div>
+          <div>
+            {{ c.name }}
+            <span v-if="c.is_key" class="badge badge-bad">关键</span>
+          </div>
           <div class="hs-ticket">{{ c.ticket_no }}</div>
         </div>
         <div>卷{{ c.paper_id }}</div>
       </div>
     </aside>
-    <div class="hs-desk-stage" v-if="data">
+    <div class="hs-desk-stage">
       <div class="hs-grid-board" :style="gridStyle">
         <div
           v-for="(cell,i) in cells" :key="i"
@@ -65,6 +85,7 @@ function paperClass(pid: number) {
           :class="{ empty: cell.empty, 'hs-viol': isViol(cell) }"
         >
           <template v-if="!cell.empty">
+            <span v-if="cell.is_key" class="hs-key-star">★</span>
             <span class="hs-paper-tag" :class="paperClass(cell.paper_id)">卷{{ cell.paper_id }}</span>
             <div>{{ cell.name }}</div>
           </template>
@@ -72,5 +93,11 @@ function paperClass(pid: number) {
         </div>
       </div>
     </div>
+  </div>
+  <div v-if="data && data.state === 'open' && (data.unplaced || []).length" class="card" style="margin-top:0.85rem">
+    <h3 style="margin-top:0">未排上（开放场允许现网未排）</h3>
+    <span v-for="u in data.unplaced" :key="u.id" class="badge badge-warn" style="margin-right:0.4rem">
+      {{ u.name }}（{{ u.ticket_no }}）
+    </span>
   </div>
 </template>

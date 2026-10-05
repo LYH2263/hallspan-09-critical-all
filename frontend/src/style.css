@@ -140,6 +140,10 @@ h1 {
 }
 .hs-desk .hs-paper-tag.a { background: var(--hs-paper-a); }
 .hs-desk .hs-paper-tag.b { background: var(--hs-paper-b); }
+.hs-desk .hs-key-star {
+  position: absolute; top: 1px; left: 4px;
+  color: var(--hs-bad); font-size: 0.72rem; font-weight: 800;
+}
 
 .card {
   background: var(--hs-clip);

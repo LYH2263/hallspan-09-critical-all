@@ -1,7 +1,15 @@
-from app.services.seat_engine import find_violations, manhattan, place_candidates, SeatAssign
+from app.services.seat_engine import (CLOSED, OPEN, find_violations, manhattan, place_candidates,
+                                      required_state, SeatAssign)
 
 def test_manhattan():
     assert manhattan((0, 0), (2, 1)) == 3
+
+def test_required_state():
+    mk = lambda key: {"id": 1, "name": "A", "ticket_no": "T1", "paper_id": 1, "is_key": key}
+    assert required_state([]) == OPEN
+    assert required_state([mk(False), mk(False)]) == OPEN
+    assert required_state([mk(False), mk(True)]) == CLOSED
+    assert OPEN != CLOSED
 
 def test_min_distance_placement():
     cands = [{"id": i, "name": f"C{i}", "ticket_no": f"T{i}", "paper_id": 1 + (i % 2)} for i in range(4)]

@@ -2,6 +2,9 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from app.models.models import Candidate, Hall, PaperSet
 
+# 5x6 grid with min_manhattan=2 seats at most 15; 16 candidates => tight grid.
+# One key candidate is marked, so the seeded session is closed and must fail
+# until all key marks are removed (then partial unplaced is allowed).
 def seed_if_empty(db: Session) -> None:
     if (db.scalar(select(func.count()).select_from(Hall)) or 0) > 0:
         return
@@ -13,8 +16,9 @@ def seed_if_empty(db: Session) -> None:
         p = PaperSet(code=code, title=title)
         db.add(p); db.flush()
         paper_ids.append(p.id)
-    names = ["陈一", "李二", "张三", "赵四", "钱五", "孙六", "周七", "吴八", "郑九", "王十", "冯十一", "陈十二"]
+    names = ["陈一", "李二", "张三", "赵四", "钱五", "孙六", "周七", "吴八",
+             "郑九", "王十", "冯十一", "陈十二", "褚十三", "卫十四", "蒋十五", "沈十六"]
     for i, name in enumerate(names):
         db.add(Candidate(hall_id=hall.id, name=name, ticket_no=f"T{2026001+i}",
-                         paper_id=paper_ids[i % len(paper_ids)]))
+                         paper_id=paper_ids[i % len(paper_ids)], is_key=(i == 0)))
     db.commit()

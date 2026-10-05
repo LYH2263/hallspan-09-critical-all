@@ -2,6 +2,10 @@
 from __future__ import annotations
 from dataclasses import asdict, dataclass
 
+# Session states: mutually exclusive, decided by the roster at submit instant.
+OPEN = "open"
+CLOSED = "closed"
+
 @dataclass
 class SeatAssign:
     candidate_id: int
@@ -10,6 +14,7 @@ class SeatAssign:
     paper_id: int
     row: int
     col: int
+    is_key: bool = False
 
 @dataclass
 class Violation:
@@ -20,6 +25,10 @@ class Violation:
 
 def manhattan(a: tuple[int, int], b: tuple[int, int]) -> int:
     return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
+def required_state(candidates: list[dict]) -> str:
+    """Session-level gate, not a seating rule: any key candidate => closed session."""
+    return CLOSED if any(c.get("is_key") for c in candidates) else OPEN
 
 def neighbors4(r: int, c: int, rows: int, cols: int) -> list[tuple[int, int]]:
     out = []
@@ -56,7 +65,8 @@ def place_candidates(rows: int, cols: int, min_dist: int, candidates: list[dict]
                         break
                 if not ok:
                     continue
-                assign = SeatAssign(cand["id"], cand["name"], cand["ticket_no"], cand["paper_id"], r, c)
+                assign = SeatAssign(cand["id"], cand["name"], cand["ticket_no"], cand["paper_id"], r, c,
+                                    bool(cand.get("is_key")))
                 occupied[(r, c)] = assign
                 placed = True
                 break
@@ -80,10 +90,12 @@ def find_violations(rows: int, cols: int, min_dist: int, assigns: list[SeatAssig
                                        f"同试卷套 {a.paper_id} 四邻相邻"))
     return viols
 
-def plan_to_dict(assigns: list[SeatAssign], unplaced: list[dict], viols: list[Violation], rows: int, cols: int) -> dict:
+def plan_to_dict(assigns: list[SeatAssign], unplaced: list[dict], viols: list[Violation], rows: int, cols: int,
+                 state: str = OPEN) -> dict:
     return {
         "rows": rows,
         "cols": cols,
+        "state": state,
         "assignments": [asdict(a) for a in assigns],
         "unplaced": unplaced,
         "violations": [asdict(v) for v in viols],
